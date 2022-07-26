@@ -1,0 +1,3 @@
+echo "Question :- # Write a Shell Script That Prints 'Shell Scripting is Fun' on the screen"
+#!/bin/bash
+echo "Shell Scripting is Fun"
