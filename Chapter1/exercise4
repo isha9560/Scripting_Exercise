@@ -1,0 +1,10 @@
+#!/bin/bash
+file="/etc/shadow"
+if [ -e "$file" ]; then
+	echo "Shadow Password are enabled."
+fi
+if [ -w "$file" ]; then
+		echo "You have permissions to edit '$file'."
+	else
+		echo "You do not have permissions to edit '$file'."
+fi

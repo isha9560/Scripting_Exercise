@@ -1,0 +1,3 @@
+#!/bin/bash
+Result=`echo "Shell Scripting is Fun"`
+echo $Result

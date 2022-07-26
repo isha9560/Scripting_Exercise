@@ -5,5 +5,5 @@
 2] Make you to add your Shebang! at first Line
 	#!/bin/bash
 
-=> For checking the question of exercise please go to kindle and find Shell Scripting Book by 
+=> For checking the question of exercise please go to kindle and find Shell Scripting Book by Jason Cannon
 

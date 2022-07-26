@@ -1,0 +1,22 @@
+#!/bin/bash
+name=$1
+echo
+if [ -z $name ]; then 
+	echo "You have entered Empty string."
+elif [ ! -e $name ]; then
+	echo "$name file does not exist. Add absolute path or check if the file name is correct"	
+elif [ -L $name ]; then
+	echo "$name is a symlink."
+elif [ -f $name ]; then
+	echo "$name is a regular file."
+elif [ -d $name ]; then
+	echo "$name is a directory."
+else
+	echo "The $name is of another type"
+fi
+
+echo
+echo "..... Below output is default behaviour ....."
+echo
+ls -l $name
+	

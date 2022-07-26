@@ -1,0 +1,10 @@
+#!/bin/bash
+echo "~~~ Method 1 ~~~ with 'backtick'"
+result=`hostname`
+echo "This script is running on "$result". Where "$result" is the output of the 'hostname' command."
+
+echo 
+
+echo "~~~ Method 2 ~~~ with '\${Variable}'"
+host_name=$(hostname)
+echo "This script is running on "$host_name". Where "$host_name" is the output of the 'hostname' command."
