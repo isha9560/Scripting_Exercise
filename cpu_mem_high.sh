@@ -35,7 +35,7 @@ read -p "Please Enter a date in DD format like 01-31: " input
 				i=$input
 				if [ -f /var/log/sa/sa$i >/dev/null 2>&1 ]; then
 					Mem=`sar -t -r -f /var/log/sa/sa$i|awk '/%memused/,/^var\/log\/sa\/sa$i:$/'|egrep -v "Average|%memused"|awk '{print $(NF-13)""$NF}'|sort -k6 -n|tail -1`
-					Cpu=`sar -t -u -f /var/log/sa/sa$i|awk '/%idle/,/^var\/log\/sa\/sa$i:$/'|egrep -v "Average|idle"|awk '{print $(NF-9)""}'|sort -k9 -n|head -1`
+					Cpu=` sar -t -P ALL -f /var/log/sa/sa27|awk '/%idle/,/^var\/log\/sa\/sa27:$/'|egrep -v "Average|idle"|awk 'NF{print $(NF-9)}'|sort -k9 -n|head -1`
 					
 					#x=`echo 100-$Cpu|bc`	
 					echo
