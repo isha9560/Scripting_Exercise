@@ -1,0 +1,200 @@
+#!/bin/bash
+
+# Identifying the Linux OS
+
+# Check if /etc/os-release file exists
+if [[ -f /etc/os-release ]]; then
+    source /etc/os-release
+    os_name=$NAME
+    os_version=$VERSION_ID
+    os_codename=$VERSION_CODENAME
+elif [[ -f /etc/lsb-release ]]; then
+    source /etc/lsb-release
+    os_name=$DISTRIB_ID
+    os_version=$DISTRIB_RELEASE
+    os_codename=$DISTRIB_CODENAME
+elif [[ -f /etc/redhat-release ]]; then
+    os_name=$(cat /etc/redhat-release | awk '{print $1}')
+    os_version=$(cat /etc/redhat-release | awk '{print $(NF-1)}')
+else
+    os_name="Unknown"
+    os_version="Unknown"
+    os_codename="Unknown"
+fi
+
+# Outputting Linux distribution details
+echo -e "\n======= Linux OS Details ======="
+echo "Distribution: $os_name"
+echo "Version: $os_version"
+echo "Codename: $os_codename"
+
+################################################################################################################################
+####################                             Fundtion for hardware details                              ####################
+################################################################################################################################
+
+f_hardware_details() {
+
+# Fetching hardware details on Linux OS
+
+# Check if dmidecode is installed
+if ! command -v dmidecode &> /dev/null; then
+    echo "dmidecode is not installed. Please install it to fetch hardware details."
+    exit 1
+fi
+
+# Processor information
+processor=$(dmidecode -t processor | grep "Version" | awk -F ": " '{print $2}')
+
+# Memory information
+total_memory=$(dmidecode -t memory | awk '/Size/ {sum += $2} END {print sum " MB"}')
+
+# Disk information
+disk_usage=$(df -h | awk '$NF=="/"{printf "Total: %s, Used: %s, Free: %s\n", $2, $3, $4}')
+
+# Network information
+ip_address=$(hostname -I)
+mac_address=$(ip link show | awk '/ether/ {print $2}')
+
+# Outputting hardware details
+echo -e "\n======= Hardware Details ======="
+echo "Processor: $processor"
+echo "Memory: $total_memory"
+echo "Disk Usage: $disk_usage"
+echo "IP Address: $ip_address"
+echo "MAC Address: $mac_address"
+}
+
+################################################################################################################################
+####################                               Function for installed PHP details                       ####################
+################################################################################################################################
+
+f_php_details() {
+# Check if PHP is installed
+if ! command -v php >/dev/null 2>&1; then
+  echo "PHP is not installed on this system."
+  exit 1
+fi
+
+# Get PHP version
+php_version=$(php -v | awk '/^PHP/ {print $2}')
+
+# Get PHP configuration file
+php_config=$(php -i | awk '/^Loaded Configuration File/ {print $5}')
+
+# Get PHP extension directory
+php_ext_dir=$(php -i | awk '/^extension_dir/ {print $3}')
+
+# Get PHP modules
+php_modules=$(php -m)
+
+# Print PHP installation details
+echo -e "\n======= PHP Details ======="
+echo "PHP Version: $php_version"
+echo "PHP Configuration File: $php_config"
+echo "PHP Extension Directory: $php_ext_dir"
+echo "PHP Modules: $php_modules"
+}
+
+
+################################################################################################################################
+####################                               Function for resource utilization details                ####################
+################################################################################################################################
+
+# Prompt the user to enter a date
+read -p "Enter the date for resource utilization output (YYYY-MM-DD) : " input_date
+
+f_resource_utilization() {
+
+# Check if the sar command is available
+if ! command -v sar >/dev/null; then
+  echo "sar command is not available. Please make sure the sysstat package is installed."
+  exit 1
+fi
+
+# Extract the year, month, and day from the input
+year=$(date -d "$input_date" +%Y)
+month=$(date -d "$input_date" +%m)
+day=$(date -d "$input_date" +%d)
+
+# Calculate resource utilization for the specified date
+echo -e "\n======= Resource utilization Details ======="
+echo "Resource utilization for $input_date:"
+
+# CPU utilization
+cpu_utilization=$(sar -u -f /var/log/sa/sa"$day" | awk '$1=="Average:" {print 100 - $NF}')
+echo "CPU Utilization: $cpu_utilization%"
+
+# Memory utilization
+memory_utilization=$(sar -r -f /var/log/sa/sa"$day" | awk '$1=="Average:" {print $4}')
+echo "Memory Utilization: $memory_utilization%"
+
+# Disk utilization
+disk_utilization=$(sar -d -f /var/log/sa/sa"$day" | awk '$1=="Average:" {print $NF}')
+echo "Disk Utilization: $disk_utilization%"
+
+# Network utilization
+network_utilization=$(sar -n DEV -f /var/log/sa/sa"$day" | awk '$1=="Average:" {print $NF}')
+echo "Network Utilization: $network_utilization%"
+}
+
+# If the user didn't provide a date, use today's date
+#if [ -z "$input_date" ]; then
+#    input_date=$(date +%F)
+#    f_resource_utilization
+#fi
+
+# Validate the date format
+if [[ ! $input_date =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}$ ]]; then
+  echo "Invalid date format. Please enter the date in YYYY-MM-DD format."
+#else
+#  f_resource_utilization
+  exit 1
+fi
+
+################################################################################################################################
+####################                               Function for Network details                #################################
+################################################################################################################################
+
+f_network_details() {
+
+
+# Get the network interfaces
+interfaces=$(ip -o link show | awk -F': ' '{print $2}')
+
+echo -e "\n======= Network Details ======="
+# Loop through each interface
+for interface in $interfaces; do
+  echo "Interface: $interface"
+
+  # Get the IP address
+  ip_address=$(ip -o -4 addr show dev $interface | awk '{print $4}')
+  echo "IP Address: $ip_address"
+
+  # Get the MAC address
+  mac_address=$(ip link show dev $interface | awk '/ether/ {print $2}')
+  echo "MAC Address: $mac_address"
+
+  # Get the network gateway
+  gateway=$(ip route show default | awk '/default via/ {print $3}')
+  echo "Gateway: $gateway"
+
+  # Get the DNS servers
+  dns_servers=$(cat /etc/resolv.conf | awk '/nameserver/ {print $2}')
+  echo "DNS Servers: $dns_servers"
+
+  # Get the network speed and duplex
+  speed_duplex=$(ethtool $interface 2>/dev/null | awk '/Speed:|Duplex:/ {print $2}')
+  echo "Speed/Duplex: $speed_duplex"
+
+  echo "-----------------------"
+done
+}
+
+########################       Function CALL          ###################
+#if [[ $os_name = "CentOS Linux" && $os_version = "7" ]]
+#        then
+f_resource_utilization
+f_hardware_details
+f_php_details
+f_network_details
+#fi
