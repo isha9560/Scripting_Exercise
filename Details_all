@@ -1,0 +1,93 @@
+#!/bin/bash
+
+function Os_Details() {
+ # Check if the /etc/lsb-release file exists
+    if [ -f /etc/lsb-release ]; then
+        # Read the contents of the /etc/lsb-release file
+        source /etc/lsb-release
+        # save the Os Name and version details
+        OS_Name=$DISTRIB_ID
+        Version=$DISTRIB_RELEASE
+        echo "OS_Name: $OS_Name"
+        echo "Version: $Version"
+else
+    # If the /etc/lsb-release file does not exist, check other files
+    if [ -f /etc/os-release ]; then
+    # Read the contents of the /etc/os-release file
+    source /etc/os-release
+   # save the Os Name and version details
+    OS_Name=$NAME
+    Version=$VERSION_ID
+    echo "OS_Name: $OS_Name"
+    echo "Version: $Version"
+    elif [ -f /etc/redhat-release ]; then
+        # Read the contents of the /etc/redhat-release file
+        OS_Name=$(cat /etc/redhat-release)
+        echo "OS_Name: $OS_Name"
+    else
+        echo "Unknown Linux distribution."
+    fi
+fi
+}
+
+
+
+
+# Gather system information
+echo "=== System Information ==="
+echo "Hostname: $(hostname)"
+echo "Operating System: $(cat /etc/os-release | grep -oP '(?<=PRETTY_NAME=").*(?=")')"
+echo "Kernel Version: $(uname -r)"
+echo "Architecture: $(uname -m)"
+echo "IP Address:$(hostname -I)"
+Os_Details
+
+
+# Gather CPU information
+echo -e "\n=== CPU Information ==="
+echo "CPU Model: $(cat /proc/cpuinfo | grep "model name" | head -n 1 | cut -d ":" -f 2 | sed 's/^ *//')"
+echo "CPU Cores: $(grep -c '^processor' /proc/cpuinfo)"
+
+# Gather memory information
+echo -e "\n=== Memory Information ==="
+echo "Total Memory: $(free -h | awk '/Mem:/ {print $2}')"
+echo "Used Memory: $(free -h | awk '/Mem:/ {print $3}')"
+echo "Free Memory: $(free -h | awk '/Mem:/ {print $4}')"
+
+# Gather disk information
+echo -e "\n=== Disk Information ==="
+df -hT
+echo -e "\n*Total Disk for /*"
+echo "Total Disk: $(df -h | awk '$NF=="/"{printf "Total: %s, Used: %s, Free: %s\n", $2, $3, $4}')"
+
+
+# Gather network information
+echo -e "\n=== Network Information ==="
+echo -e "\nIP Adddress"
+ip addr
+echo -e "\nMAC Address"
+ip link show | awk '/ether/ {print $2}'
+
+# Gather installed packages
+echo -e "\n=== Installed Packages ==="
+if command -v apt-get &> /dev/null; then
+  echo "APT Packages: Check the dpkg_list file "
+  dpkg --get-selections > dpkg_list
+elif command -v yum &> /dev/null; then
+  echo "YUM Packages:Check the rpm_list file "
+  rpm -qa > rpm_list
+else
+  echo "Package manager not found."
+fi
+
+# Gather System Manufacturer
+echo -e "\n=== System Manufacturer ==="
+if command -v dmidecode &> /dev/null; then
+        echo "System Information: $(dmidecode|grep -A 2 "System Information")"
+        else
+        echo "Product_name: $(cat /sys/class/dmi/id/product_name)"
+        echo "Chassis_vendor: $(cat /sys/class/dmi/id/chassis_vendor)"
+fi
+
+
+echo "=== Script execution completed ==="
