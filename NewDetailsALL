@@ -1,0 +1,96 @@
+#!/bin/bash
+# Check if the sar command is available
+
+if ! command -v sar >/dev/null; then
+  echo "sar command is not available. Please make sure the sysstat package is installed."
+  exit 1
+else
+        read -p "Do you want to grab overall resource Utilization data then press 'y' else want to go with specific date press 'n' (y/n): " response
+                if [[ $response =~ ^[Yy]$ ]]; then
+
+        read -p "Please provide the Full directory path to store the details : " utilz
+        mkdir -p $utilz
+		
+function sar_cpu_avg() {
+	echo "+----------------------------------------------------------------------------------+"
+	echo "|Average:         CPU     %user     %nice   %system   %iowait    %steal     %idle  |"
+	echo "+----------------------------------------------------------------------------------+"
+	for file in `ls -tr /var/log/sa/sa* | grep -v sar`
+	do
+	dat=`sar -f $file | head -n 1 | awk '{print $4}'`
+	echo -n $dat
+	sar -f $file  | grep -i Average | sed "s/Average://"
+	done
+	echo "+----------------------------------------------------------------------------------+"
+	}
+	
+function sar_memory_avg() {
+	echo "+-------------------------------------------------------------------------------------------------------------------+"
+	echo "|Average:       kbmemfree kbmemused  %memused kbbuffers kbcached  kbcommit   %commit  kbactive   kbinact   kbdirty  |"
+	echo "+-------------------------------------------------------------------------------------------------------------------+"
+	for file in `ls -tr /var/log/sa/sa* | grep -v sar`
+	do
+	dat=`sar -f $file | head -n 1 | awk '{print $4}'`
+	echo -n $dat
+	sar -r -f $file  | grep -i Average | sed "s/Average://"
+	done
+	echo "+-------------------------------------------------------------------------------------------------------------------+"
+	}
+	
+function sar_cpu_mem_avg() {
+	for file in `ls -tr /var/log/sa/sa* | grep -v sar`
+	do
+			sar -f $file | head -n 1 | awk '{print $4}'
+			echo "-----------"
+			sar -u -f $file | awk '/Average:/{printf("CPU Average: %.2f%\n"), 100 - $8}'
+			sar -r -f $file | awk '/Average:/{printf("Memory Average: %.2f%\n"),(($3-$5-$6)/($2+$3)) * 100 }'
+			printf "\n"
+	done
+	}
+	
+     sar_cpu_avg > $utilz/sar-cpu-avg_overall
+	 sar_memory_avg > $utilz/sar-memory-avg_overall
+	 sar_cpu_mem_avg > $utilz/sar-cpu-mem-avg_overall
+	 
+        echo "Check the $utilz location to get the resource utilization data"
+else
+
+# Prompt the user to enter a date
+read -p "Enter the date (YYYY-MM-DD) : " input_date
+
+f_resource_utilization() {
+
+# Extract the year, month, and day from the input
+year=$(date -d "$input_date" +%Y)
+month=$(date -d "$input_date" +%m)
+day=$(date -d "$input_date" +%d)
+
+# Calculate resource utilization for the specified date
+echo "Resource utilization for $input_date:"
+
+# CPU utilization
+cpu_utilization=$(sar -u -f /var/log/sa/sa"$day" | awk '$1=="Average:" {print 100 - $NF}')
+echo "CPU Utilization: $cpu_utilization%"
+
+# Memory utilization
+memory_utilization=$(sar -r -f /var/log/sa/sa"$day" | awk '$1=="Average:" {print $4}')
+echo "Memory Utilization: $memory_utilization%"
+
+# Disk utilization
+disk_utilization=$(sar -d -f /var/log/sa/sa"$day" | awk '$1=="Average:" {print $NF}')
+echo "Disk Utilization: $disk_utilization%"
+
+# Network utilization
+network_utilization=$(sar -n DEV -f /var/log/sa/sa"$day" | awk '$1=="Average:" {print $NF}')
+echo "Network Utilization: $network_utilization%"
+}
+
+# Validate the date format
+if [[ ! $input_date =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}$ ]]; then
+  echo "Invalid date format. Please enter the date in YYYY-MM-DD format."
+else
+  f_resource_utilization
+  exit 1
+fi
+fi
+fi
