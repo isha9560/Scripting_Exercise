@@ -1,5 +1,9 @@
 #!/bin/bash
 
+
+
+f_migration_stats() {
+
 # Identifying the Linux OS
 
 # Check if /etc/os-release file exists
@@ -29,24 +33,24 @@ echo "Version: $os_version"
 echo "Codename: $os_codename"
 
 ################################################################################################################################
-####################                             Fundtion for hardware details                              ####################
+####################                             Function for hardware details                              ####################
 ################################################################################################################################
 
 f_hardware_details() {
 
 # Fetching hardware details on Linux OS
 
-# Check if dmidecode is installed
-if ! command -v dmidecode &> /dev/null; then
-    echo "dmidecode is not installed. Please install it to fetch hardware details."
-    exit 1
-fi
+
+sf_hw_detail(){
+
+# System information
+system_info=$(sudo dmidecode|grep -A 2 "System Information")
 
 # Processor information
-processor=$(dmidecode -t processor | grep "Version" | awk -F ": " '{print $2}')
+processor=$(sudo dmidecode -t processor | grep "Version" | awk -F ": " '{print $2}')
 
 # Memory information
-total_memory=$(dmidecode -t memory | awk '/Size/ {sum += $2} END {print sum " MB"}')
+total_memory=$(sudo dmidecode -t memory | awk '/Size/ {sum += $2} END {print sum " MB"}')
 
 # Disk information
 disk_usage=$(df -h | awk '$NF=="/"{printf "Total: %s, Used: %s, Free: %s\n", $2, $3, $4}')
@@ -57,11 +61,23 @@ mac_address=$(ip link show | awk '/ether/ {print $2}')
 
 # Outputting hardware details
 echo -e "\n======= Hardware Details ======="
+echo "System Information: $system_info"
 echo "Processor: $processor"
 echo "Memory: $total_memory"
 echo "Disk Usage: $disk_usage"
 echo "IP Address: $ip_address"
 echo "MAC Address: $mac_address"
+}
+
+# Check if dmidecode is installed
+if ! command -v dmidecode &> /dev/null; then
+    echo "dmidecode is not installed. Fetching basic details."
+    echo "Product_name: $(sudo cat /sys/class/dmi/id/product_name)"
+    echo "Chassis_vendor: $(sudo cat /sys/class/dmi/id/chassis_vendor)"
+    echo "sys_vendor: $(sudo cat /sys/class/dmi/id/sys_vendor)"
+        else
+        sf_hw_detail
+fi
 }
 
 ################################################################################################################################
@@ -191,10 +207,54 @@ done
 }
 
 ########################       Function CALL          ###################
-#if [[ $os_name = "CentOS Linux" && $os_version = "7" ]]
-#        then
+if [[ $os_name = "CentOS Linux" && $os_version = "7" ]]
+        then
 f_resource_utilization
 f_hardware_details
 f_php_details
 f_network_details
+fi
+}
+
+#f_migration_stats
+
+
+
+############################# Sudo access validation #####################
+
+#if [[ "$(id -u)" != "0" ]] && [ ! sudo -n true 2>/dev/null ]; then
+#    echo "This script must be run by the sudo user or the root user. Exiting..."
+#    exit 1
+#else
+#date
+#fi
+if [ "$(id -u)" != "0" ] ; then
+  echo "===== ======"
+  echo "Please provide the current user password"
+  read -s password
+        if ! $(echo "$password"|sudo -S grep root /etc/sudoers > /dev/null 2>&1); then
+                echo "=== This script must be run by the sudo user or the root user. Exiting... ==="
+                exit 1
+        else
+        echo "You have the sudo rights"
+        f_migration_stats
+        exit 1
+        fi
+else
+echo "you are a root user"
+        f_migration_stats
+fi
+
+#if [ "$(id -u)" != "0" ]; then
+#        echo "== Seems you are logged in via normal User =="
+#        read -p "Do you have the sudo access? (y/n): " response
+#       if [[ $response =~ ^[Yy]$ ]]; then
+#               f_migration_stats
+#                echo "Thank you for informing"
+#        elif [ "$(id -u)" = "0" ]; then
+#               f_migration_stats
+#                echo "You are Root User"
+#        else
+#                exit 1
+#        fi
 #fi
