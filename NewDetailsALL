@@ -1,4 +1,6 @@
-#!/bin/bash
+
+
+F_resource_utilization() {
 # Check if the sar command is available
 
 if ! command -v sar >/dev/null; then
@@ -94,3 +96,4 @@ else
 fi
 fi
 fi
+}
