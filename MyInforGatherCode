@@ -1,0 +1,683 @@
+#!/bin/bash
+
+##---------------------------------------------------------------------------------------------------------------##
+# This is a Function to gather Generic Details
+## --------------------------------------------------------------------------------------------------------------##
+
+f_general_details() {
+
+function Os_Detls() {
+ # Check if the /etc/lsb-release file exists
+    if [ -f /etc/lsb-release ]; then
+        # Read the contents of the /etc/lsb-release file
+        source /etc/lsb-release
+        # save the Os Name and version details
+        OS_Name=$DISTRIB_ID
+        Version=$DISTRIB_RELEASE
+        echo "Operating System: $OS_Name"
+        echo "Operating System Version: $Version"
+else
+    # If the /etc/lsb-release file does not exist, check other files
+    if [ -f /etc/os-release ]; then
+    # Read the contents of the /etc/os-release file
+    source /etc/os-release
+   # save the Os Name and version details
+    OS_Name=$NAME
+    Version=$VERSION_ID
+    echo "Operating System: $OS_Name"
+    echo "Operating System Version: $Version"
+    elif [ -f /etc/redhat-release ]; then
+        # Read the contents of the /etc/redhat-release file
+        OS_Name=$(cat /etc/redhat-release)
+        echo "Operating System: $OS_Name"
+    else
+        echo "Unknown Linux distribution."
+    fi
+fi
+}
+
+
+# Gather system information
+echo "=== System Information ==="
+echo "Hostname: $(hostname)"
+echo "Kernel Version: $(uname -r)"
+echo "Architecture: $(uname -m)"
+echo "IP Address:$(hostname -I)"
+Os_Detls
+
+
+# Gather CPU information
+echo -e "\n=== CPU Information ==="
+echo "CPU Model: $(cat /proc/cpuinfo | grep "model name" | head -n 1 | cut -d ":" -f 2 | sed 's/^ *//')"
+echo "CPU Cores: $(grep -c '^processor' /proc/cpuinfo)"
+
+# Gather memory information
+echo -e "\n=== Memory Information ==="
+echo "Total Memory: $(free -h | awk '/Mem:/ {print $2}')"
+echo "Used Memory: $(free -h | awk '/Mem:/ {print $3}')"
+echo "Free Memory: $(free -h | awk '/Mem:/ {print $4}')"
+
+# Gather disk information
+echo -e "\n=== Disk Information ==="
+df -hT
+echo -e "\n=== * Total Disk for / * ==="
+echo "Total Disk: $(df -h | awk '$NF=="/"{printf "Total: %s, Used: %s, Free: %s\n", $2, $3, $4}')"
+
+
+# Gather network information
+echo -e "\n=== Network Information ==="
+echo -e "\n=== IP Adddress check $dir_to_store/All_server_details/ip_addr.txt ==="
+ip addr 2>&1 > $dir_to_store/All_server_details/ip_addr.txt
+echo -e "\n=== MAC Address ==="
+ip link show | awk '/ether/ {print $2}'
+echo -e "\n=== IP Routes $dir_to_store/All_server_details/route_n.txt ==="
+route -n 2>&1 > $dir_to_store/All_server_details/route_n.txt
+echo -e "\n=== IP Routes $dir_to_store/All_server_details/ip_route_show.txt ==="
+ip route show 2>&1 > $dir_to_store/All_server_details/ip_route_show.txt
+
+# Gather installed packages
+echo -e "\n=== Installed Packages ==="
+if command -v apt-get &> /dev/null; then
+  echo -e "\n=== APT Packages: Check the $dir_to_store/All_server_details/packages_installed.txt file ==="
+  dpkg --get-selections 2>&1 > $dir_to_store/All_server_details/packages_installed.txt
+elif command -v yum &> /dev/null; then
+  echo -e "\n=== YUM Packages:Check the $dir_to_store/All_server_details/packages_installed.txt file ==="
+  rpm -qa  2>&1 > $dir_to_store/All_server_details/packages_installed.txt
+else
+  echo -e "\n=== Package manager not found or script is not aware of it. ==="
+fi
+
+# Gather System Manufacturer
+echo -e "\n=== System Manufacturer ==="
+if command -v dmidecode &> /dev/null; then
+        echo "System Information: $(dmidecode|grep -A 2 "System Information")"
+        else
+        echo "Product_name: $(cat /sys/class/dmi/id/product_name)"
+        echo "Chassis_vendor: $(cat /sys/class/dmi/id/chassis_vendor)"
+fi
+
+
+# Gather Details for User' having sudoe access.
+
+sudo_users1=`egrep -w "wheel|sudo" /etc/group|cut -d: -f4`
+sudo_users2=`egrep -v "#|Defaults" /etc/sudoers|grep ALL|awk '{print $1}'|egrep -v "wheel|sudo|root"`
+sudo_users3=`echo $sudo_users1,$sudo_users2`
+echo -e "\n === User having Sudo access ==="
+echo "Sudo Access users: $sudo_users3" 2>&1
+
+
+
+echo ""
+echo ""
+echo " === End Of the file ==="
+
+}
+
+
+##---------------------------------------------------------------------------------------------------------------##
+# This is a Function to gather Information about the Mounts and bind mounts#
+## --------------------------------------------------------------------------------------------------------------##
+
+f_bind_and_mount() {
+
+# Retrieve all mounts from /proc/mounts
+# echo > $dir_to_store/All_server_details/mounts_bindMounts.txt
+
+echo "---"
+echo "You can Find the Generic data of all mounts on the server even if it is not in fstab like BindMount"
+echo "----"
+
+all_mounts=$(findmnt -m | awk '{if(NR>1)print}')
+# Iterate over each mount
+while read -r mount_entry; do
+  # Extract mount point and mount type
+  mount_point=$(echo "$mount_entry" | awk '{print $1}')
+  source=$(echo "$mount_entry" | awk '{print $2}')
+  mount_type=$(echo "$mount_entry" | awk '{print $3}')
+
+  # Check if it's a bind mount
+  if [[ $source =~ "[" ]]; then
+echo "---------------------------------------------------------------------------------------------------------"
+echo " === Bind Mount Entires ==="
+        echo "Bind Mount: $mount_point"
+        echo "Source: $source"
+        echo "FsType: $mount_type"
+        echo "--------"
+echo "---------------------------------------------------------------------------------------------------------"
+  else
+        echo "Mount: $mount_point"
+        echo "Source: $source"
+        echo "FsType: $mount_type"
+        echo "--------"
+
+  fi
+done <<< "$all_mounts"
+
+#echo "===>                            ------------------                                            <==="
+#echo " Please find all mounts over the server using mtab command $dir_to_store/All_server_details/mounts_bindMounts.txt"
+#echo "===>                            ------------------                                            <==="
+#echo ""
+
+}
+
+
+##---------------------------------------------------------------------------------------------------------------##
+# This is a Function to gather Information about the Mounts and bind mountsi using the findmnt and fstab#
+## --------------------------------------------------------------------------------------------------------------##
+
+f_fstab_bind_and_mount() {
+
+# Retrieve all mounts from fstab file
+# echo 2>&1 > $dir_to_store/All_server_details/findmount_fstab.txt
+
+echo "---"
+echo "Extentioon to generic details"
+echo "----"
+
+fstab_mounts=$(findmnt --fstab --evaluate | awk '{if(NR>1)print}')
+# Iterate over each mount
+while read -r fmounts_entry; do
+  # Extract mounts point and mount type
+  mount_point=$(echo "$fmounts_entry" | awk '{print $1}')
+  source=$(echo "$fmounts_entry" | awk '{print $2}')
+  mount_type=$(echo "$fmounts_entry" | awk '{print $3}')
+  options=$(echo "$fmounts_entry" | awk '{print $4}')
+
+  # Check if it's a bind mount
+  if [[ $source =~ "[" ]]; then
+    echo "Bind Mount: $mount_point"
+        echo "Source: $source"
+        echo "FsType: $mount_type"
+        echo "Options: $options"
+        echo "--------"
+
+  else
+        echo "Mount: $mount_point"
+        echo "Source: $source"
+        echo "FsType: $mount_type"
+        echo "Options: $options"
+        echo "--------"
+
+  fi
+done <<< "$fstab_mounts"
+}
+
+
+
+
+##---------------------------------------------------------------------------------------------------------------##
+# This is a Function to gather Information about the device User details#
+## --------------------------------------------------------------------------------------------------------------##
+
+f_getusers_info() {
+# Function to get user information and permissions
+function get_user_info() {
+    username="$1"
+
+    # Get user ID and group ID
+    user_id=$(id -u "$username")
+    group_id=$(id -g "$username")
+
+    # Get user information from /etc/passwd
+    user_info=$(getent passwd "$username")
+
+    # Extract user's home directory and default shell
+    home_directory=$(echo "$user_info" | awk -F: '{print $6}')
+    default_shell=$(echo "$user_info" | awk -F: '{print $7}')
+
+    # Get user's primary group from /etc/group
+    primary_group=$(getent group "$group_id" | awk -F: '{print $1}')
+
+    # Get supplementary groups
+    supplementary_groups=$(id -Gn "$username" | tr ' ' ',')
+
+    # Print user information
+    echo "User: $username"
+    echo "User ID: $user_id"
+    echo "Group ID: $group_id"
+    echo "Home Directory: $home_directory"
+    echo "Default Shell: $default_shell"
+    echo "Primary Group: $primary_group"
+    echo "Supplementary Groups: $supplementary_groups"
+    echo "---"
+}
+
+
+# Get a list of non-system users
+# Empty the file
+
+# echo > $dir_to_store/All_server_details/user_details.txt
+
+if [ "$(grep -w UID_MIN /etc/login.defs|awk '{printf $2}')" != '500' ]; then
+non_system_users=$(getent passwd | awk -F: '$3 >= 1000 && $3 != 65534 {print $1}')
+
+# Iterate over non-system users and get their information
+for user in $non_system_users; do
+    get_user_info "$user" 2>&1 >> $dir_to_store/All_server_details/user_details.txt
+done
+
+else
+        non_system_users=$(getent passwd | awk -F: '$3 >= 500 && $3 != 65534 {print $1}')
+        # Iterate over non-system users and get their information
+        for user in $non_system_users; do
+        get_user_info "$user"
+        done
+fi
+
+# echo "===>                            ------------------                                            <==="
+# echo "Please Find the user details in $dir_to_store/All_server_details/user_details.txt "
+# echo "===>                            ------------------                                            <==="
+# echo ""
+
+}
+
+
+
+##---------------------------------------------------------------------------------------------------------------##
+# This is a Function to gather Information about the resource utilization from Sar result#
+## --------------------------------------------------------------------------------------------------------------##
+
+f_utlization_data() {
+
+#!/bin/bash
+# Check if the sar command is available
+
+# Check Linux distribution
+get_linux_distro() {
+  if [ -f /etc/os-release ]; then
+    source /etc/os-release
+    echo "$ID"
+  elif [ -f /etc/lsb-release ]; then
+    source /etc/lsb-release
+    echo "$DISTRIB_ID"
+  elif [ -f /etc/redhat-release ]; then
+    echo "rhel"
+  elif [ -f /etc/SuSE-release ]; then
+    echo "sles"
+  else
+    echo "Unsupported"
+  fi
+}
+
+# Get Linux distribution
+linux_distro=$(get_linux_distro)
+
+case $linux_distro in
+    [Uu]buntu|[Dd]ebian)
+        sar_log_location="/var/log/sysstat"
+        ;;
+    [Cc]entos|[Rr]hel)
+        sar_log_location="/var/log/sa"
+        ;;
+     [Ss]les|[Oo]pensuse)
+        sar_log_location="/var/log"
+        ;;
+    *)
+        echo "Unsupported distribution."
+        #exit 1
+        ;;
+esac
+
+
+if ! command -v sar >/dev/null; then
+  echo "sar command is not available. Please make sure the sysstat package is installed."
+  exit 1
+ #break
+else
+        read -p "Do you want to grab overall resource Utilization data then press 'y' else want to go with specific date press 'n' (y/n): " response
+if [[ $response =~ ^[Yy]$ ]]; then
+
+     #   read -p "Please provide the Full directory path to store the details : " utilz
+     #   mkdir -p $utilz
+
+
+        # Check if 30 days of sar files are available
+        days_to_check=30
+        sar_files=()
+        for ((i = $days_to_check - 1; i >= 0; i--)); do
+          check_date=$(date -d "$i days ago" +%Y-%m-%d|cut -d - -f3)
+          sar_file="$sar_log_location/sa$check_date"
+          if [[ -f "$sar_file" ]]; then
+            sar_files+=("$sar_file")
+          fi
+        done
+
+# Check if any sar files exist
+if [[ ${#sar_files[@]} -eq 0 ]]; then
+  echo "No sar files found for the last $days_to_check days."
+  exit
+fi
+
+
+
+# Iterate over each sar file
+for sar_file in "${sar_files[@]}"; do
+  # Extract the date from the sar file name
+  dateb=$(basename "$sar_file" | sed 's/^sa//')
+  date=$(date -d "$i days ago" +%Y-%m)
+  # Get the average CPU utilization
+
+
+function sar_cpu_avg() {
+        echo "===== Average CPU  utilization for $date-$dateb: ===="
+        echo ""
+        echo "+----------------------------------------------------------------------------------+"
+        echo "|Average:         CPU     %user     %nice   %system   %iowait    %steal     %idle  |"
+        echo "+----------------------------------------------------------------------------------+"
+        for file in `ls -tr "$sar_file" | grep -v sar`
+        do
+        dat=`sar -f $file | head -n 1 | awk '{print $4}'`
+        echo -n $dat
+        sar -f $file  | grep -i Average | sed "s/Average://"
+        done
+        echo "+----------------------------------------------------------------------------------+"
+        }
+
+function sar_memory_avg() {
+        echo "===== Average Memory  utilization for $date-$dateb: ===="
+        echo ""
+        echo "+-------------------------------------------------------------------------------------------------------------------+"
+        echo "|Average:       kbmemfree kbmemused  %memused kbbuffers kbcached  kbcommit   %commit  kbactive   kbinact   kbdirty  |"
+        echo "+-------------------------------------------------------------------------------------------------------------------+"
+        for file in `ls -tr "$sar_file" | grep -v sar`
+        do
+        dat=`sar -f $file | head -n 1 | awk '{print $4}'`
+        echo -n $dat
+        sar -r -f $file  | grep -i Average | sed "s/Average://"
+        done
+        echo "+-------------------------------------------------------------------------------------------------------------------+"
+        }
+
+function sar_cpu_mem_avg() {
+        echo "===== Average CPU and MEM  utilization for $date-$dateb: ===="
+        echo ""
+        for file in `ls -tr "$sar_file" | grep -v sar`
+        do
+                        sar -f $file | head -n 1 | awk '{print $4}'
+                        echo "-----------"
+                        sar -u -f $file | awk '/Average:/{printf("CPU Average: %.2f%\n"), 100 - $8}'
+                        sar -r -f $file | awk '/Average:/{printf("Memory Average: %.2f%\n"),(($3-$5-$6)/($2+$3)) * 100 }'
+                        printf "\n"
+        done
+        }
+
+
+sar_cpu_avg
+sar_memory_avg
+sar_cpu_mem_avg
+done
+
+else
+
+# Prompt the user to enter a date
+read -p "Enter the date (YYYY-MM-DD) : " input_date
+
+years_to_check=$(date +%Y)
+years_from_input_date=$(date -d "$input_date" +%Y)
+
+if [[ $years_to_check != $years_from_input_date ]]; then
+  echo " No Sar file found for the Year $years_from_input_date"
+  exit
+fi
+
+f_resource_utilization() {
+
+# Extract the year, month, and day from the input
+year=$(date -d "$input_date" +%Y)
+month=$(date -d "$input_date" +%m)
+day=$(date -d "$input_date" +%d)
+
+# Calculate resource utilization for the specified date
+echo "Resource utilization for $input_date:"
+
+# CPU utilization
+cpu_utilization=$(sar -u -f $sar_log_location/sa"$day" | awk '$1=="Average:" {print 100 - $NF}')
+echo "CPU Utilization: $cpu_utilization%"
+
+# Memory utilization
+memory_utilization=$(sar -r -f $sar_log_location/sa"$day" | awk '$1=="Average:" {print $4}')
+echo "Memory Utilization: $memory_utilization%"
+
+# Disk utilization
+disk_utilization=$(sar -d -f $sar_log_location/sa"$day" | awk '$1=="Average:" {print $NF}')
+echo "Disk Utilization: $disk_utilization%"
+
+# Network utilization
+network_utilization=$(sar -n DEV -f $sar_log_location/sa"$day" | awk '$1=="Average:" {print $NF}')
+echo "Network Utilization: $network_utilization%"
+}
+
+# Validate the date format
+if [[ ! $input_date =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}$ ]]; then
+  echo "Invalid date format. Please enter the date in YYYY-MM-DD format."
+else
+  f_resource_utilization
+  exit 1
+fi
+fi
+fi
+
+
+#echo "===>                            ------------------                                            <==="
+#echo "Please find Utilization using Sar in "$dir_to_store/All_server_details/utilization_from_sar.txt" File"
+#echo "===>                            ------------------                                            <==="
+#echo ""
+}
+
+
+##---------------------------------------------------------------------------------------------------------------##
+# This is a Function to gather Information about the device is Virtual or Physical and using that find out details#
+## --------------------------------------------------------------------------------------------------------------##
+
+f_pys_virt_env() {
+# Get the manufacturer and product_name
+
+        manufacturer=$(sudo dmidecode -s system-manufacturer)
+        product_name=$(sudo dmidecode -s system-product-name)
+if [ -z "$(ls -A /sys/hypervisor/ > /dev/null 2>&1)" ]; then
+
+  # Get the system manufacturer and product name
+
+        if [[ $manufacturer =~ (HP) || $product_name =~ (HP) ]]; then
+
+                echo "===>                            ------------------                                            <==="
+                echo " This is $manufacturer device "
+                echo "===>                            ------------------                                            <==="
+                echo ""
+                                # Add set of commands for HP
+
+                elif [[ $manufacturer =~ (Dell) || $product_name =~ (Dell) ]]; then
+                echo "===>                            ------------------                                            <==="
+                echo " This is $manufacturer device "
+                echo "===>                            ------------------                                            <==="
+                echo ""
+                  # Add set of commands for DELL
+
+                elif [[ $manufacturer =~ (VMware) || $product_name =~ (VMware) ]]; then
+                echo "===>                            ------------------                                            <==="
+                echo "This is $manufacturer device"
+                echo "===>                            ------------------                                            <==="
+                echo ""
+                    # Add set of commands for Vmware
+
+                else
+                        echo "===>                            ------------------                                            <==="
+                        echo "This device is $manufacturer and is Virtual"
+                        echo "===>                            ------------------                                            <==="
+                        echo ""
+                        # Seems we do not need to worry about as it is cloud devices
+        fi
+fi
+}
+
+##---------------------------------------------------------------------------------------------------------------##
+# This is a Function to gather Raid details for HP and DELL Devices
+## --------------------------------------------------------------------------------------------------------------##
+
+
+f_raid_details() {
+
+f_for_hp() {
+# Function to check if a command is available
+command_exists() {
+  command -v "$1" >/dev/null 2>&1
+}
+    # Check if device has HP Smart Storage RAID configured
+    if command_exists "ssacli" && ssacli ctrl all show config | grep -q "logicaldrive"; then
+        echo "Device $device has HP Smart Storage RAID configured."
+
+                echo "=== FirmWare check ==="
+                hpasmcli -s "show server"
+                echo -e "\n"
+                echo -e "\n=== Find the RAID controller ==="
+                ssacli controller all show
+                echo -e "\n"
+                slot_d=$(ssacli controller all show|awk '{print $6}'|grep "\S")
+                echo -e "\n=== View Occupied and Empty Drive Bays ==="
+                        ssacli controller slot=$slot_d enclosure all show detail
+                echo -e "\n"
+                echo -e "\n===View Virtual Disks ==="
+                ssacli controller slot=$slot_d logicaldrive all show
+                echo -e "\n"
+                echo -e "\n===View Physical Disks ==="
+                ssacli controller slot=$slot_d physicaldrive all show
+                echo -e "\n"
+    fi
+
+}
+
+
+f_for_Dell() {
+command_exists() {
+  command -v "$1" >/dev/null 2>&1
+}
+
+    if command_exists "omreport" && omreport storage controller > /dev/null; then
+        echo "Device $device has Dell PERC RAID configured (using omreport)."
+        echo "=== FirmWare check ==="
+                omreport system version
+                echo -e "\n"
+                echo -e "\n=== Find the RAID controller ==="
+                omreport storage controller|egrep -w "^ID|^Status|^Name|^Slot ID|^State|^Firmware Version|^Driver Version" |sed  '/Driver Version/a ========================='
+                ctrl_id=$(omreport storage controller|grep -w ^ID|awk '{print $3}')
+                echo -e "\n"
+                echo -e "\n=== View Occupied and Empty Drive Bays ==="
+                omreport storage controller controller=$ctrl_id info=pdslotreport | head -n 8
+                echo -e "\n"
+                echo -e "\n===View Virtual Disks ==="
+                omreport storage vdisk|egrep -w "^ID|Name|Layout|Size|Device Name"|sed  '/Device Name/a ========================='|grep -v "Stripe Element Size"
+                echo -e "\n"
+                echo -e "\n===View Physical Disks ==="
+                omreport storage pdisk controller=$ctrl_id|egrep -w "^ID|^Status|^Name|^State"| sed  '/State/a ========================='
+                echo -e "\n"
+    fi
+
+}
+
+
+f_find_dell_hp() {
+# Function to check if a command is available
+command_exists() {
+  command -v "$1" >/dev/null 2>&1
+}
+
+# Function to check if a device is Dell
+is_dell_device() {
+  sudo dmidecode -s system-manufacturer | grep -iq "dell"
+}
+
+# Function to check if a device is HP
+is_hp_device() {
+  sudo dmidecode -s system-manufacturer | grep -iq "hp"
+}
+
+# Iterate through all block devices
+    # Check if device is Dell
+    if is_dell_device; then
+
+                f_for_Dell
+
+    fi
+
+    # Check if device is HP
+    if is_hp_device; then
+
+                f_for_hp
+
+    fi
+
+}
+
+
+# Iterate through all block devices
+
+f_find_dell_hp
+
+
+    # Check if device has EMC PowerPath (emcpower)
+if [[ $(sudo powermt display dev=all 2>/dev/null | grep "emcpower") ]]; then
+        echo "Device $device has EMC PowerPath (emcpower) configured." 2>&1 > $dir_to_store/All_server_details/powermnt_displya_all.txt
+                echo "=== SAN Storage check ===" 2>&1 >> $dir_to_store/All_server_details/powermnt_displya_all.txt
+                powermt display dev=all | egrep "^Pseudo|^Device"  2>&1 >> $dir_to_store/All_server_details/powermnt_displya_all.txt
+                echo -e "\n" 2>&1 >> $dir_to_store/All_server_details/powermnt_displya_all.txt
+                powermt display dev=all | egrep 'Pseudo|Logical' | sed 'N; s/\n/ =/' | cut -d '=' -f2,4 | tr -s "=" " " 2>&1 >> $dir_to_store/All_server_details/powermnt_displya_all.txt
+                echo -e "\n" 2>&1 >> $dir_to_store/All_server_details/powermnt_displya_all.txt
+                echo "=== Details of all disks ===" 2>&1 >> $dir_to_store/All_server_details/powermnt_displya_all.txt
+                echo -e "\n" 2>&1 >> $dir_to_store/All_server_details/powermnt_displya_all.txt
+                powermt display dev=all 2>&1 >> $dir_to_store/All_server_details/powermnt_displya_all.txt
+
+    elif [[ $(sudo multipath -ll "$device" 2>/dev/null | grep "dm-") ]]; then
+        echo "Device $device has multipath configured." 2>&1 > $dir_to_store/All_server_details/Multipath_details.txt
+                echo "=== If Multipath ===" 2>&1 >> $dir_to_store/All_server_details/Multipath_details.txt
+                multipath -ll | grep ^mpath 2>&1 >> $dir_to_store/All_server_details/Multipath_details.txt
+                echo -e "\n" 2>&1 >> $dir_to_store/All_server_details/Multipath_details.txt
+    fi
+
+}
+
+
+if [ "$(id -u)" != "0" ] ; then
+  echo "===== ======"
+  echo "Please provide the current user password"
+  read -s password
+        if ! $(echo "$password"|sudo -S grep root /etc/sudoers > /dev/null 2>&1); then
+                echo "=== This script must be run by the sudo user or the root user. Exiting... ==="
+                exit 1
+        else
+        echo "You have the sudo rights But our script is limited to root so please login via ROOT user"
+        exit 1
+        fi
+else
+echo "==== PLEASE PROVIDE THE DIRECTORY TO STORE THE DETAILS ==== "
+read dir_to_store
+echo ""
+mkdir -p $dir_to_store/All_server_details
+
+
+echo ""
+echo "In Progress ..."
+echo "Loading you data Please wait for a While In Progress ..."
+echo "In Progress ..."
+echo "In Progress ..."
+
+### Execute the Functions now to get the details ############
+f_pys_virt_env 2>&1 > $dir_to_store/All_server_details/Hardware_details_dummy.txt
+f_getusers_info 2>&1 > $dir_to_store/All_server_details/user_details.txt
+f_utlization_data 2>&1 > $dir_to_store/All_server_details/utilization_from_sar.txt
+f_bind_and_mount 2>&1 > $dir_to_store/All_server_details/mounts_bindMounts.txt
+f_fstab_bind_and_mount 2>&1 > $dir_to_store/All_server_details/findmount_fstab.txt
+f_general_details 2>&1 > $dir_to_store/All_server_details/generic_details.txt
+f_raid_details  2>&1 > $dir_to_store/All_server_details/Raid_details_physc.txt
+
+
+echo "In Progress ..."
+echo "In Progress ..."
+echo "In Progress ..."
+
+
+fi
+
+
+echo -e "\n##----------------------------------------------------------------------------------------------------------------------##"
+echo -e "\n#  Please find the datails under folder  --> $dir_to_store/All_server_details <<-- Please find the details under folder ##"
+echo -e "\n## -------------------------------------------------------------------------------------------------------------------- ##"
